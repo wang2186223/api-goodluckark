@@ -15,8 +15,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
-  // Configuration parameter
-  const REVENUE_ADJUSTMENT_FACTOR = 0.7;
+  // 根据请求来源域名确定访问权限和转接比例
+  const host = req.headers.host || '';
+  
+  // 只允许 api.advertisingreport.net 访问，其他域名拒绝
+  if (!host.includes('api.advertisingreport.net')) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  // api.advertisingreport.net 使用 50% 转接比例
+  const REVENUE_ADJUSTMENT_FACTOR = 0.5;
   
   // 检查是否是浏览器请求（Accept 头包含 text/html）
   const acceptHeader = req.headers.accept || '';

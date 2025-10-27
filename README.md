@@ -183,3 +183,12 @@ Vercel 会自动为你的域名配置 SSL 证书，通常在几分钟内完成�
 
 **项目创建时间**: 2025年10月14日  
 **GitHub 仓库**: https://github.com/wang2186223/api-google-pop.git
+
+
+
+
+
+
+现在您的调整系数位置在代码的第 16 行：
+
+const REVENUE_ADJUSTMENT_FACTOR = 0.7;
