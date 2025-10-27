@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/adapi",
+      "destination": "/api/index.js"
+    }
+  ],
   "redirects": [
     {
       "source": "/",
