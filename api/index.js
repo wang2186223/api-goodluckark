@@ -100,9 +100,16 @@ export default async function handler(req, res) {
       if (!Array.isArray(data)) return data;
       
       return data.map(item => {
+        // 根据数据日期判断使用的转接比例
+        // 2025年11月1日前的数据：50%
+        // 2025年11月1日及之后的数据：40%
+        const itemDate = new Date(item.date);
+        const cutoffDate = new Date('2025-11-01');
+        const adjustmentFactor = itemDate < cutoffDate ? 0.5 : 0.4;
+        
         // 处理 revenue: 乘以调整系数
         const originalRevenue = parseFloat(item.revenue || 0);
-        const adjustedRevenue = originalRevenue * REVENUE_ADJUSTMENT_FACTOR;
+        const adjustedRevenue = originalRevenue * adjustmentFactor;
         
         // 处理 ecpm: 使用调整后的 revenue 计算
         const impressions = parseInt(item.impressions || 0);
