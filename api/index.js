@@ -70,7 +70,7 @@ export default async function handler(req, res) {
     }
     
     // 构建目标 API URL
-    const targetUrl = new URL('https://api.adoptima.net/get_app_data/get_adx');
+    const targetUrl = new URL('https://api.adoptima.net/get_app_data/get_netlink_adx');
     targetUrl.searchParams.set('username', username);
     targetUrl.searchParams.set('password', password);
     targetUrl.searchParams.set('from_date', from_date);
