@@ -235,7 +235,7 @@ export default async function handler(req, res) {
           ).join('');
       
       // 生成CSV数据用于下载
-      const csvData = isNewFormat 
+      const csvData = (isNewFormat 
         ? [
             // 新格式 CSV 表头
             ['date_reported','domain','website','adunit','impressions','clicks','revenue','ad_ecpm','ad_requests'].join(','),
@@ -272,7 +272,7 @@ export default async function handler(req, res) {
               item.revenue || ''
             ].join(','))
           ]
-      ].join('\\n');
+      ).join('\\n');
       
       // 根据数据格式生成不同的表头
       const tableHeader = isNewFormat
