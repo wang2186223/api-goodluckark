@@ -111,11 +111,9 @@ export default async function handler(req, res) {
       if (!Array.isArray(data)) return data;
       
       return data.map(item => {
-        // 根据数据日期判断使用的转接比例
-        // 2025年11月1日前的数据：50%
-        // 2025年11月1日至12月8日的数据：60%
-        // 2025年12月9日及之后的数据：80%
-        const itemDate = new Date(item.date);
+        // 支持新旧两种格式：date 或 date_reported
+        const dateField = item.date || item.date_reported;
+        const itemDate = new Date(dateField);
         const nov1Date = new Date('2025-11-01');
         const dec9Date = new Date('2025-12-09');
         
@@ -139,11 +137,21 @@ export default async function handler(req, res) {
           adjustedEcpm = (adjustedRevenue / impressions * 1000).toFixed(6);
         }
         
-        return {
+        // 返回时保持原有字段名，同时更新 ecpm 和 ad_ecpm
+        const result = {
           ...item,
-          revenue: adjustedRevenue.toFixed(6),
-          ecpm: adjustedEcpm
+          revenue: adjustedRevenue.toFixed(6)
         };
+        
+        // 支持两种 ecpm 字段名
+        if (item.ecpm !== undefined) {
+          result.ecpm = adjustedEcpm;
+        }
+        if (item.ad_ecpm !== undefined) {
+          result.ad_ecpm = adjustedEcpm;
+        }
+        
+        return result;
       });
     };
     
@@ -152,70 +160,126 @@ export default async function handler(req, res) {
     
     // 如果是浏览器请求，返回简化的表格
     if (isBrowserRequest) {
+      // 检测数据格式（新格式有 date_reported，旧格式有 date）
+      const isNewFormat = data.length > 0 && data[0].date_reported !== undefined;
+      
       // 对敏感数据进行混淆处理
       const obfuscatedData = data.map((item, index) => {
         const row = {};
-        // 使用随机顺序和混淆字段名
-        const fieldMap = {
-          'dt': item.date,
-          'un': item.url_name,
-          'an': item.app_name,
-          'dv': item.device,
-          'au': item.adunit,
-          'ck': item.clicks,
-          'im': item.impressions,
-          'ct': item.ctr,
-          'ec': item.ecpm,
-          'cp': item.cpc,
-          'rq': item.requests,
-          'mr': item.match_rate,
-          'rv': item.revenue
-        };
-        return fieldMap;
+        if (isNewFormat) {
+          // 新格式字段映射
+          const fieldMap = {
+            'dr': item.date_reported,
+            'dm': item.domain,
+            'ws': item.website,
+            'au': item.adunit,
+            'im': item.impressions,
+            'ck': item.clicks,
+            'rv': item.revenue,
+            'ae': item.ad_ecpm,
+            'ar': item.ad_requests
+          };
+          return fieldMap;
+        } else {
+          // 旧格式字段映射
+          const fieldMap = {
+            'dt': item.date,
+            'un': item.url_name,
+            'an': item.app_name,
+            'dv': item.device,
+            'au': item.adunit,
+            'ck': item.clicks,
+            'im': item.impressions,
+            'ct': item.ctr,
+            'ec': item.ecpm,
+            'cp': item.cpc,
+            'rq': item.requests,
+            'mr': item.match_rate,
+            'rv': item.revenue
+          };
+          return fieldMap;
+        }
       });
       
       // 动态生成混淆的HTML，避免暴露数据结构
-      const tableRows = data.map((item, idx) => 
-        `<tr>${[
-          item.date || '',
-          item.url_name || '', 
-          item.app_name || '',
-          item.device || '',
-          item.adunit || '',
-          item.clicks || '',
-          item.impressions || '',
-          item.ctr || '',
-          item.ecpm || '',
-          item.cpc || '',
-          item.requests || '',
-          item.match_rate || '',
-          item.revenue || ''
-        ].map(val => `<td>${val}</td>`).join('')}</tr>`
-      ).join('');
+      const tableRows = isNewFormat 
+        ? data.map((item, idx) => 
+            `<tr>${[
+              item.date_reported || '',
+              item.domain || '',
+              item.website || '',
+              item.adunit || '',
+              item.impressions || '',
+              item.clicks || '',
+              item.revenue || '',
+              item.ad_ecpm || '',
+              item.ad_requests || ''
+            ].map(val => `<td>${val}</td>`).join('')}</tr>`
+          ).join('')
+        : data.map((item, idx) => 
+            `<tr>${[
+              item.date || '',
+              item.url_name || '', 
+              item.app_name || '',
+              item.device || '',
+              item.adunit || '',
+              item.clicks || '',
+              item.impressions || '',
+              item.ctr || '',
+              item.ecpm || '',
+              item.cpc || '',
+              item.requests || '',
+              item.match_rate || '',
+              item.revenue || ''
+            ].map(val => `<td>${val}</td>`).join('')}</tr>`
+          ).join('');
       
       // 生成CSV数据用于下载
-      const csvData = [
-        // CSV 表头
-        ['date','url_name','app_name','device','adunit','clicks','impressions','ctr','ecpm','cpc','requests','match_rate','revenue'].join(','),
-        // CSV 数据行
-        ...data.map(item => [
-          item.date || '',
-          `"${(item.url_name || '').replace(/"/g, '""')}"`,
-          `"${(item.app_name || '').replace(/"/g, '""')}"`, 
-          `"${(item.device || '').replace(/"/g, '""')}"`,
-          `"${(item.adunit || '').replace(/"/g, '""')}"`,
-          item.clicks || '',
-          item.impressions || '',
-          item.ctr || '',
-          item.ecpm || '',
-          item.cpc || '',
-          item.requests || '',
-          item.match_rate || '',
-          item.revenue || ''
-        ].join(','))
+      const csvData = isNewFormat 
+        ? [
+            // 新格式 CSV 表头
+            ['date_reported','domain','website','adunit','impressions','clicks','revenue','ad_ecpm','ad_requests'].join(','),
+            // 新格式 CSV 数据行
+            ...data.map(item => [
+              item.date_reported || '',
+              `"${(item.domain || '').replace(/"/g, '""')}"`,
+              `"${(item.website || '').replace(/"/g, '""')}"`,
+              `"${(item.adunit || '').replace(/"/g, '""')}"`,
+              item.impressions || '',
+              item.clicks || '',
+              item.revenue || '',
+              item.ad_ecpm || '',
+              item.ad_requests || ''
+            ].join(','))
+          ]
+        : [
+            // 旧格式 CSV 表头
+            ['date','url_name','app_name','device','adunit','clicks','impressions','ctr','ecpm','cpc','requests','match_rate','revenue'].join(','),
+            // 旧格式 CSV 数据行
+            ...data.map(item => [
+              item.date || '',
+              `"${(item.url_name || '').replace(/"/g, '""')}"`,
+              `"${(item.app_name || '').replace(/"/g, '""')}"`, 
+              `"${(item.device || '').replace(/"/g, '""')}"`,
+              `"${(item.adunit || '').replace(/"/g, '""')}"`,
+              item.clicks || '',
+              item.impressions || '',
+              item.ctr || '',
+              item.ecpm || '',
+              item.cpc || '',
+              item.requests || '',
+              item.match_rate || '',
+              item.revenue || ''
+            ].join(','))
+          ]
       ].join('\\n');
       
-      const htmlResult = `<!DOCTYPE html><html lang="en-US"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Report - ${from_date} to ${to_date}</title><style>body{font-family:Arial,sans-serif;margin:20px;background:#f8f9fa;color:#333}.container{max-width:100%;margin:0 auto;background:white;padding:30px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);overflow-x:auto}.header{text-align:center;padding:20px 0;border-bottom:2px solid #007bff;margin-bottom:30px}.header h1{color:#007bff;margin:0;font-size:24px}.period{color:#666;margin-top:5px}.data-table{width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #dee2e6;font-size:12px}.data-table th,.data-table td{border:1px solid #dee2e6;padding:8px;text-align:left;white-space:nowrap}.data-table th{background:#007bff;color:white;font-weight:600;position:sticky;top:0}.data-table tr:nth-child(even){background:#f8f9fa}.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #dee2e6;color:#666;font-size:14px}.record-count{text-align:center;margin-bottom:20px;font-size:16px;font-weight:bold;color:#007bff}.download-btn{background:#28a745;color:white;padding:12px 24px;border:none;border-radius:6px;cursor:pointer;font-size:14px;margin:10px;text-decoration:none;display:inline-block}.download-btn:hover{background:#218838}</style></head><body><div class="container"><div class="header"><h1>📊 Advertising Report</h1><div class="period">Period: ${from_date} - ${to_date}</div></div><div class="record-count">Total Records: ${Array.isArray(data) ? data.length : 0} <button class="download-btn" onclick="downloadCSV()">📥 Download CSV</button></div>${Array.isArray(data) && data.length > 0 ? `<table class="data-table"><thead><tr><th>date</th><th>url_name</th><th>app_name</th><th>device</th><th>adunit</th><th>clicks</th><th>impressions</th><th>ctr</th><th>ecpm</th><th>cpc</th><th>requests</th><th>match_rate</th><th>revenue</th></tr></thead><tbody>${tableRows}</tbody></table>` : `<div style="text-align:center;padding:40px;color:#666"><h3>📭 No Data</h3><p>No data found for the specified date range</p></div>`}<div class="footer">Report generated at ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}</div></div><script>function downloadCSV(){const csvContent="${csvData.replace(/"/g, '\\"')}";const blob=new Blob([csvContent],{type:'text/csv;charset=utf-8;'});const link=document.createElement('a');if(link.download!==undefined){const url=URL.createObjectURL(blob);link.setAttribute('href',url);link.setAttribute('download','advertising-report-${from_date}-${to_date}.csv');link.style.visibility='hidden';document.body.appendChild(link);link.click();document.body.removeChild(link);}}</script></body></html>`;
+      // 根据数据格式生成不同的表头
+      const tableHeader = isNewFormat
+        ? '<tr><th>date_reported</th><th>domain</th><th>website</th><th>adunit</th><th>impressions</th><th>clicks</th><th>revenue</th><th>ad_ecpm</th><th>ad_requests</th></tr>'
+        : '<tr><th>date</th><th>url_name</th><th>app_name</th><th>device</th><th>adunit</th><th>clicks</th><th>impressions</th><th>ctr</th><th>ecpm</th><th>cpc</th><th>requests</th><th>match_rate</th><th>revenue</th></tr>';
+      
+      const htmlResult = `<!DOCTYPE html><html lang="en-US"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Report - ${from_date} to ${to_date}</title><style>body{font-family:Arial,sans-serif;margin:20px;background:#f8f9fa;color:#333}.container{max-width:100%;margin:0 auto;background:white;padding:30px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);overflow-x:auto}.header{text-align:center;padding:20px 0;border-bottom:2px solid #007bff;margin-bottom:30px}.header h1{color:#007bff;margin:0;font-size:24px}.period{color:#666;margin-top:5px}.data-table{width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #dee2e6;font-size:12px}.data-table th,.data-table td{border:1px solid #dee2e6;padding:8px;text-align:left;white-space:nowrap}.data-table th{background:#007bff;color:white;font-weight:600;position:sticky;top:0}.data-table tr:nth-child(even){background:#f8f9fa}.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #dee2e6;color:#666;font-size:14px}.record-count{text-align:center;margin-bottom:20px;font-size:16px;font-weight:bold;color:#007bff}.download-btn{background:#28a745;color:white;padding:12px 24px;border:none;border-radius:6px;cursor:pointer;font-size:14px;margin:10px;text-decoration:none;display:inline-block}.download-btn:hover{background:#218838}</style></head><body><div class="container"><div class="header"><h1>📊 Advertising Report</h1><div class="period">Period: ${from_date} - ${to_date}</div></div><div class="record-count">Total Records: ${Array.isArray(data) ? data.length : 0} <button class="download-btn" onclick="downloadCSV()">📥 Download CSV</button></div>${Array.isArray(data) && data.length > 0 ? `<table class="data-table"><thead>${tableHeader}</thead><tbody>${tableRows}</tbody></table>` : `<div style="text-align:center;padding:40px;color:#666"><h3>📭 No Data</h3><p>No data found for the specified date range</p></div>`}<div class="footer">Report generated at ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}</div></div><script>function downloadCSV(){const csvContent="${csvData.replace(/"/g, '\\"')}";const blob=new Blob([csvContent],{type:'text/csv;charset=utf-8;'});const link=document.createElement('a');if(link.download!==undefined){const url=URL.createObjectURL(blob);link.setAttribute('href',url);link.setAttribute('download','advertising-report-${from_date}-${to_date}.csv');link.style.visibility='hidden';document.body.appendChild(link);link.click();document.body.removeChild(link);}}</script></body></html>`;
       
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       return res.status(200).send(htmlResult);
