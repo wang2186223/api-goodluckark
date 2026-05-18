@@ -69,8 +69,19 @@ export default async function handler(req, res) {
       });
     }
     
+    // 根据username选择对应的API端点
+    let apiEndpoint;
+    if (username === 'arknovel1') {
+      apiEndpoint = 'https://portal.netlinkad.com/get_app_data/get_z_adx';
+    } else if (username === 'goodluckark.com') {
+      apiEndpoint = 'https://portal.netlinkad.com/get_app_data/get_netlink_adx';
+    } else {
+      // 默认使用get_netlink_adx
+      apiEndpoint = 'https://portal.netlinkad.com/get_app_data/get_netlink_adx';
+    }
+    
     // 构建目标 API URL
-    const targetUrl = new URL('https://portal.netlinkad.com/get_app_data/get_netlink_adx');
+    const targetUrl = new URL(apiEndpoint);
     targetUrl.searchParams.set('username', username);
     targetUrl.searchParams.set('password', password);
     targetUrl.searchParams.set('from_date', from_date);
