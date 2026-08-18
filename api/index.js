@@ -75,6 +75,8 @@ export default async function handler(req, res) {
       apiEndpoint = 'https://portal.netlinkad.com/get_app_data/get_z_adx';
     } else if (username === 'goodluckark.com') {
       apiEndpoint = 'https://portal.netlinkad.com/get_app_data/get_netlink_adx';
+    } else if (username === 'cjnumberone.com' || username === 'yoyonovelvibe.com' || username === 'arknovelvibe.com') {
+      apiEndpoint = 'https://portal.netlinkad.com/get_app_data/get_adx';
     } else {
       // 默认使用get_netlink_adx
       apiEndpoint = 'https://portal.netlinkad.com/get_app_data/get_netlink_adx';
